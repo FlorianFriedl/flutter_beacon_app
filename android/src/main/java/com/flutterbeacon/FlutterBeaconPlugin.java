@@ -89,7 +89,7 @@ public class FlutterBeaconPlugin implements MethodCallHandler,
     }
 
     if (call.method.equals("reset")) {
-      result(null);
+      result.success(null);
       return;
     }
 
