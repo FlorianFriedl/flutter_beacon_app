@@ -55,6 +55,11 @@ class FlutterBeacon {
   }
 
   /// Close scanning API.
+  Future<void> reset() async {
+    await _methodChannel.invokeMethod('reset');
+  }
+
+  /// Close scanning API.
   Future<void> get close async {
     await _methodChannel.invokeMethod('close');
   }

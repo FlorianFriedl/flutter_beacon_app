@@ -88,6 +88,11 @@ public class FlutterBeaconPlugin implements MethodCallHandler,
       return;
     }
 
+    if (call.method.equals("reset")) {
+      result(null);
+      return;
+    }
+
     if (call.method.equals("close")) {
       if (beaconManager != null && beaconManager.isBound(beaconConsumer)) {
         beaconManager.unbind(beaconConsumer);

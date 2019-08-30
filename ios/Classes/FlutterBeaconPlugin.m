@@ -42,6 +42,8 @@
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
     if ([@"initialize" isEqualToString:call.method]) {
         [self initializeWithResult:result];
+    } else if([@"reset" isEqualToString:call.method]) {
+        [self resetMonitoringBeaconsWithResult:result];
     } else {
         result(FlutterMethodNotImplemented);
     }
@@ -124,6 +126,18 @@
     
     // Initialize central manager and detect bluetooth state
     self.bluetoothManager = [[CBCentralManager alloc] initWithDelegate:self queue:dispatch_get_main_queue()];
+}
+
+///------------------------------------------------------------
+#pragma mark - Flutter Beacon Reset Monitoring
+///------------------------------------------------------------
+
+- (void) resetMonitoringBeaconsWithResult:(FlutterResult)result {
+    for (CLBeaconRegion *r in self.locationManager.monitoredRegions) {
+        NSLog(@"RESET: %@", r);
+        [self.locationManager stopMonitoringForRegion:r];
+    }
+    result(nil);
 }
 
 ///------------------------------------------------------------
