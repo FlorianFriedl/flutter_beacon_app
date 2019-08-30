@@ -7,6 +7,7 @@ library flutter_beacon;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -51,6 +52,11 @@ class FlutterBeacon {
   /// whether location services is enabled.
   Future<void> get initializeScanning async {
     await _methodChannel.invokeMethod('initialize');
+  }
+
+  /// Close scanning API.
+  Future<void> get close async {
+    await _methodChannel.invokeMethod('close');
   }
 
   /// Start ranging iBeacons with defined [List] of [Region]s.

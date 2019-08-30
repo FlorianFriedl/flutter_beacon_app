@@ -1,6 +1,6 @@
 # flutter_beacon
 
-[![](/pub/v/flutter_beacon.svg)](https://github.com/alann-maulana/flutter_beacon) [![](/github/license/alann-maulana/flutter_beacon.svg)](https://github.com/alann-maulana/flutter_beacon/blob/master/LICENSE)
+[![Pub](https://img.shields.io/pub/v/flutter_beacon.svg)](https://pub.dartlang.org/packages/flutter_beacon) [![GitHub](https://img.shields.io/github/license/alann-maulana/flutter_beacon.svg)](https://github.com/alann-maulana/flutter_beacon/blob/master/LICENSE)
 
 [Flutter plugin](https://pub.dartlang.org/packages/flutter_beacon/) to work with iBeacons.  
 
@@ -10,6 +10,7 @@ Features:
 
 * Automatic permission management
 * Ranging iBeacons  
+* Monitoring iBeacons
 
 ## Installation
 
@@ -17,7 +18,7 @@ Add to pubspec.yaml:
 
 ```yaml
 dependencies:
-  flutter_beacon: ^0.1.1
+  flutter_beacon: ^0.2.4
 ```
 
 ### Setup specific for Android
@@ -43,7 +44,13 @@ Permission must be declared in `ios/Runner/Info.plist`:
   <!-- When in use -->
   <key>NSLocationWhenInUseUsageDescription</key>
   <string>Reason why app needs location</string>
-  ...
+  <!-- Always -->
+  <!-- for iOS 11 + -->
+  <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+  <string>Reason why app needs location</string>
+  <!-- for iOS 9/10 -->
+  <key>NSLocationAlwaysUsageDescription</key>
+  <string>Reason why app needs location</string>
 </dict>
 ```
 
@@ -58,7 +65,7 @@ Ranging APIs are designed as reactive streams.
 ```dart
 try {
   await flutterBeacon.initializeScanning;
-} on PlatformException {
+} on PlatformException catch(e) {
   // library failed to initialize, check code and message
 }
 ```
@@ -77,10 +84,37 @@ if (Platform.isIOS) {
   regions.add(Region(identifier: 'com.beacon'));
 }
 
-flutterBeacon.ranging(regions).listen((RangingResult result) {
+// to start ranging beacons
+_streamRanging = flutterBeacon.ranging(regions).listen((RangingResult result) {
   // result contains a region and list of beacons found
   // list can be empty if no matching beacons were found in range
 });
+
+// to stop ranging beacons
+_streamRanging.cancel();
+```
+
+### Monitoring beacons
+
+```dart
+final regions = <Region>[];
+
+if (Platform.isIOS) {
+  regions.add(Region(
+      identifier: 'Apple Airlocate',
+      proximityUUID: 'E2C56DB5-DFFB-48D2-B060-D0F5A71096E0'));
+} else {
+  // android platform, it can ranging out of beacon that filter all of Proximity UUID
+  regions.add(Region(identifier: 'com.beacon'));
+}
+
+// to start monitoring beacons
+_streamMonitoring = flutterBeacon.monitoring(regions).listen((MonitoringResult result) {
+  // result contains a region, event type and event state
+});
+
+// to stop monitoring beacons
+_streamMonitoring.cancel();
 ```
 
 ## Under the hood
@@ -90,7 +124,7 @@ flutterBeacon.ranging(regions).listen((RangingResult result) {
 
 # Author
 
-Flutter Beacon plugin is developed by Alann Maulana. You can contact me at <alann.maulana@outlook.com>.
+Flutter Beacon plugin is developed by Alann Maulana. You can contact me at <kangmas.alan@gmail.com>.
 
 
 ## License
