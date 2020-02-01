@@ -2,8 +2,10 @@
 #import <CoreBluetooth/CoreBluetooth.h>
 #import <CoreLocation/CoreLocation.h>
 #import "FBUtils.h"
+#import "FBBluetoothStateHandler.h"
 #import "FBRangingStreamHandler.h"
 #import "FBMonitoringStreamHandler.h"
+#import "FBAuthorizationStatusHandler.h"
 
 @interface FlutterBeaconPlugin() <CLLocationManagerDelegate, CBCentralManagerDelegate>
 
@@ -14,8 +16,11 @@
 
 @property (strong, nonatomic) FBRangingStreamHandler* rangingHandler;
 @property (strong, nonatomic) FBMonitoringStreamHandler* monitoringHandler;
+@property (strong, nonatomic) FBBluetoothStateHandler* bluetoothHandler;
+@property (strong, nonatomic) FBAuthorizationStatusHandler* authorizationHandler;
 
 @property FlutterResult flutterResult;
+@property FlutterResult flutterBluetoothResult;
 
 @end
 
@@ -37,15 +42,143 @@
     [FlutterEventChannel eventChannelWithName:@"flutter_beacon_event_monitoring"
                               binaryMessenger:[registrar messenger]];
     [streamChannelMonitoring setStreamHandler:instance.monitoringHandler];
+    
+    instance.bluetoothHandler = [[FBBluetoothStateHandler alloc] initWithFlutterBeaconPlugin:instance];
+    FlutterEventChannel* streamChannelBluetooth =
+    [FlutterEventChannel eventChannelWithName:@"flutter_bluetooth_state_changed"
+                              binaryMessenger:[registrar messenger]];
+    [streamChannelBluetooth setStreamHandler:instance.bluetoothHandler];
+    
+    instance.authorizationHandler = [[FBAuthorizationStatusHandler alloc] initWithFlutterBeaconPlugin:instance];
+    FlutterEventChannel* streamChannelAuthorization =
+    [FlutterEventChannel eventChannelWithName:@"flutter_authorization_status_changed"
+                              binaryMessenger:[registrar messenger]];
+    [streamChannelAuthorization setStreamHandler:instance.authorizationHandler];
 }
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
     if ([@"initialize" isEqualToString:call.method]) {
+        [self initializeLocationManager];
+        [self initializeCentralManager];
+        result(@(YES));
+        return;
+    }
+    
+    if ([@"initializeAndCheck" isEqualToString:call.method]) {
         [self initializeWithResult:result];
-    } else if([@"reset" isEqualToString:call.method]) {
+    }
+    
+    if([@"reset" isEqualToString:call.method]) {
         [self resetMonitoringBeaconsWithResult:result];
-    } else {
-        result(FlutterMethodNotImplemented);
+    }
+    
+    if ([@"authorizationStatus" isEqualToString:call.method]) {
+        [self initializeLocationManager];
+        
+        switch ([CLLocationManager authorizationStatus]) {
+            case kCLAuthorizationStatusNotDetermined:
+                result(@"NOT_DETERMINED");
+                break;
+            case kCLAuthorizationStatusRestricted:
+                result(@"RESTRICTED");
+                break;
+            case kCLAuthorizationStatusDenied:
+                result(@"DENIED");
+                break;
+            case kCLAuthorizationStatusAuthorizedAlways:
+                result(@"ALWAYS");
+                break;
+            case kCLAuthorizationStatusAuthorizedWhenInUse:
+                result(@"WHEN_IN_USE");
+                break;
+        }
+        return;
+    }
+    
+    if ([@"checkLocationServicesIfEnabled" isEqualToString:call.method]) {
+        result(@([CLLocationManager locationServicesEnabled]));
+        return;
+    }
+    
+    if ([@"bluetoothState" isEqualToString:call.method]) {
+        self.flutterBluetoothResult = result;
+        [self initializeCentralManager];
+        
+        // Delay 2 seconds
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            if (self.flutterBluetoothResult) {
+                switch(self.bluetoothManager.state) {
+                    case CBManagerStateUnknown:
+                        self.flutterBluetoothResult(@"STATE_UNKNOWN");
+                        break;
+                    case CBManagerStateResetting:
+                        self.flutterBluetoothResult(@"STATE_RESETTING");
+                        break;
+                    case CBManagerStateUnsupported:
+                        self.flutterBluetoothResult(@"STATE_UNSUPPORTED");
+                        break;
+                    case CBManagerStateUnauthorized:
+                        self.flutterBluetoothResult(@"STATE_UNAUTHORIZED");
+                        break;
+                    case CBManagerStatePoweredOff:
+                        self.flutterBluetoothResult(@"STATE_OFF");
+                        break;
+                    case CBManagerStatePoweredOn:
+                        self.flutterBluetoothResult(@"STATE_ON");
+                        break;
+                }
+                self.flutterBluetoothResult = nil;
+            }
+        });
+        return;
+    }
+    
+    if ([@"requestAuthorization" isEqualToString:call.method]) {
+        if (self.locationManager) {
+            self.flutterResult = result;
+            [self.locationManager requestAlwaysAuthorization];
+        } else {
+            result(@(YES));
+        }
+        return;
+    }
+    
+    if ([@"openBluetoothSettings" isEqualToString:call.method]) {
+        // not implemented
+    }
+    
+    if ([@"openLocationSettings" isEqualToString:call.method]) {
+        // not implemented
+    }
+    
+    if ([@"openApplicationSettings" isEqualToString:call.method]) {
+        [[UIApplication sharedApplication] openURL:[NSURL URLWithString:UIApplicationOpenSettingsURLString]];
+        result(@(YES));
+        return;
+    }
+    
+    if ([@"close" isEqualToString:call.method]) {
+        [self stopRangingBeacon];
+        [self stopMonitoringBeacon];
+        result(@(YES));
+        return;
+    }
+    
+    result(FlutterMethodNotImplemented);
+}
+
+- (void) initializeCentralManager {
+    if (!self.bluetoothManager) {
+        // initialize central manager if it itsn't
+        self.bluetoothManager = [[CBCentralManager alloc] initWithDelegate:self queue:dispatch_get_main_queue()];
+    }
+}
+
+- (void) initializeLocationManager {
+    if (!self.locationManager) {
+        // initialize location manager if it itsn't
+        self.locationManager = [[CLLocationManager alloc] init];
+        self.locationManager.delegate = self;
     }
 }
 
@@ -121,11 +254,9 @@
 
 - (void) initializeWithResult:(FlutterResult)result {
     self.flutterResult = result;
-    self.locationManager = [[CLLocationManager alloc] init];
-    self.locationManager.delegate = self;
     
-    // Initialize central manager and detect bluetooth state
-    self.bluetoothManager = [[CBCentralManager alloc] initWithDelegate:self queue:dispatch_get_main_queue()];
+    [self initializeLocationManager];
+    [self initializeCentralManager];
 }
 
 ///------------------------------------------------------------
@@ -148,21 +279,69 @@
     NSString *message = nil;
     switch(central.state) {
         case CBManagerStateUnknown:
+            if (self.flutterBluetoothResult) {
+                self.flutterBluetoothResult(@"STATE_UNKNOWN");
+                self.flutterBluetoothResult = nil;
+                return;
+            }
             message = @"CBManagerStateUnknown";
+            if (self.flutterEventSinkBluetooth) {
+                self.flutterEventSinkBluetooth(@"STATE_UNKNOWN");
+            }
             break;
         case CBManagerStateResetting:
+            if (self.flutterBluetoothResult) {
+                self.flutterBluetoothResult(@"STATE_RESETTING");
+                self.flutterBluetoothResult = nil;
+                return;
+            }
             message = @"CBManagerStateResetting";
+            if (self.flutterEventSinkBluetooth) {
+                self.flutterEventSinkBluetooth(@"STATE_RESETTING");
+            }
             break;
         case CBManagerStateUnsupported:
+            if (self.flutterBluetoothResult) {
+                self.flutterBluetoothResult(@"STATE_UNSUPPORTED");
+                self.flutterBluetoothResult = nil;
+                return;
+            }
             message = @"CBManagerStateUnsupported";
+            if (self.flutterEventSinkBluetooth) {
+                self.flutterEventSinkBluetooth(@"STATE_UNSUPPORTED");
+            }
             break;
         case CBManagerStateUnauthorized:
+            if (self.flutterBluetoothResult) {
+                self.flutterBluetoothResult(@"STATE_UNAUTHORIZED");
+                self.flutterBluetoothResult = nil;
+                return;
+            }
             message = @"CBManagerStateUnauthorized";
+            if (self.flutterEventSinkBluetooth) {
+                self.flutterEventSinkBluetooth(@"STATE_UNAUTHORIZED");
+            }
             break;
         case CBManagerStatePoweredOff:
+            if (self.flutterBluetoothResult) {
+                self.flutterBluetoothResult(@"STATE_OFF");
+                self.flutterBluetoothResult = nil;
+                return;
+            }
             message = @"CBManagerStatePoweredOff";
+            if (self.flutterEventSinkBluetooth) {
+                self.flutterEventSinkBluetooth(@"STATE_OFF");
+            }
             break;
         case CBManagerStatePoweredOn:
+            if (self.flutterBluetoothResult) {
+                self.flutterBluetoothResult(@"STATE_ON");
+                self.flutterBluetoothResult = nil;
+                return;
+            }
+            if (self.flutterEventSinkBluetooth) {
+                self.flutterEventSinkBluetooth(@"STATE_ON");
+            }
             if ([CLLocationManager locationServicesEnabled]) {
                 if ([CLLocationManager authorizationStatus] == kCLAuthorizationStatusNotDetermined) {
                     //[self.locationManager requestWhenInUseAuthorization];
@@ -197,18 +376,33 @@
     NSString *message = nil;
     switch (status) {
         case kCLAuthorizationStatusAuthorizedAlways:
+            if (self.flutterEventSinkAuthorization) {
+                self.flutterEventSinkAuthorization(@"ALWAYS");
+            }
             // manage scanning
             break;
         case kCLAuthorizationStatusAuthorizedWhenInUse:
+            if (self.flutterEventSinkAuthorization) {
+                self.flutterEventSinkAuthorization(@"WHEN_IN_USE");
+            }
             // manage scanning
             break;
         case kCLAuthorizationStatusDenied:
+            if (self.flutterEventSinkAuthorization) {
+                self.flutterEventSinkAuthorization(@"DENIED");
+            }
             message = @"CLAuthorizationStatusDenied";
             break;
         case kCLAuthorizationStatusRestricted:
+            if (self.flutterEventSinkAuthorization) {
+                self.flutterEventSinkAuthorization(@"RESTRICTED");
+            }
             message = @"CLAuthorizationStatusRestricted";
             break;
         case kCLAuthorizationStatusNotDetermined:
+            if (self.flutterEventSinkAuthorization) {
+                self.flutterEventSinkAuthorization(@"NOT_DETERMINED");
+            }
             message = @"CLAuthorizationStatusNotDetermined";
             break;
     }

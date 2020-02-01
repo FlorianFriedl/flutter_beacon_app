@@ -1,4 +1,4 @@
-//  Copyright (c) 2018 Alann Maulana.
+//  Copyright (c) 2018 Eyro Labs.
 //  Licensed under Apache License v2.0 that can be
 //  found in the LICENSE file.
 
@@ -37,26 +37,30 @@ class Beacon {
   /// The proximity of beacon.
   final Proximity _proximity;
 
-  const Beacon(
-      {this.proximityUUID,
-      this.macAddress,
-      this.major,
-      this.minor,
-      this.rssi,
-      this.txPower,
-      this.accuracy})
-      : this._proximity = null;
+  /// Create beacon object.
+  const Beacon({
+    this.proximityUUID,
+    this.macAddress,
+    this.major,
+    this.minor,
+    this.rssi,
+    this.txPower,
+    this.accuracy,
+    Proximity proximity,
+  }) : this._proximity = proximity;
 
   /// Create beacon object from json.
   Beacon.fromJson(dynamic json)
-      : proximityUUID = json['proximityUUID'],
-        macAddress = json['macAddress'],
-        major = json['major'],
-        minor = json['minor'],
-        rssi = _parseInt(json['rssi']),
-        txPower = _parseInt(json['txPower']),
-        accuracy = _parseDouble(json['accuracy']),
-        _proximity = _parseProximity(json['proximity']);
+      : this(
+          proximityUUID: json['proximityUUID'],
+          macAddress: json['macAddress'],
+          major: json['major'],
+          minor: json['minor'],
+          rssi: _parseInt(json['rssi']),
+          txPower: _parseInt(json['txPower']),
+          accuracy: _parseDouble(json['accuracy']),
+          proximity: _parseProximity(json['proximity']),
+        );
 
   /// Parsing dynamic data into double.
   static double _parseDouble(dynamic data) {
@@ -127,7 +131,7 @@ class Beacon {
       'minor': minor,
       'rssi': rssi ?? -1,
       'accuracy': accuracy,
-      'proximity': proximity.toString()
+      'proximity': proximity.toString().split('.').last
     };
 
     if (Platform.isAndroid) {
@@ -164,5 +168,30 @@ class Beacon {
     }
 
     return Proximity.far;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Beacon &&
+          runtimeType == other.runtimeType &&
+          proximityUUID == other.proximityUUID &&
+          major == other.major &&
+          minor == other.minor &&
+          (Platform.isAndroid ? macAddress == other.macAddress : true);
+
+  @override
+  int get hashCode {
+    int hashCode = proximityUUID.hashCode ^ major.hashCode ^ minor.hashCode;
+    if (Platform.isAndroid) {
+      hashCode = hashCode ^ macAddress.hashCode;
+    }
+
+    return hashCode;
+  }
+
+  @override
+  String toString() {
+    return json.encode(toJson);
   }
 }

@@ -1,4 +1,4 @@
-//  Copyright (c) 2018 Alann Maulana.
+//  Copyright (c) 2018 Eyro Labs.
 //  Licensed under Apache License v2.0 that can be
 //  found in the LICENSE file.
 
@@ -13,12 +13,18 @@ class RangingResult {
   final List<Beacon> beacons;
 
   /// Constructor for deserialize dynamic json into [RangingResult].
-  RangingResult._from(dynamic json)
-      : region = Region._fromJson(json['region']),
+  RangingResult.from(dynamic json)
+      : region = Region.fromJson(json['region']),
         beacons = Beacon.beaconFromArray(json['beacons']);
+
+  /// Return the serializable of this object into [Map].
+  dynamic get toJson => <String, dynamic>{
+        'region': region.toJson,
+        'beacons': Beacon.beaconArrayToJson(beacons),
+      };
 
   @override
   String toString() {
-    return 'RangingResult{"region": ${json.encode(region.toJson)}, "beacons": ${json.encode(Beacon.beaconArrayToJson(beacons))}}';
+    return json.encode(toJson);
   }
 }

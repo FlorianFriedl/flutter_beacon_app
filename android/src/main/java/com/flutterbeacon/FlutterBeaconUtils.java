@@ -1,5 +1,7 @@
 package com.flutterbeacon;
 
+import android.util.Log;
+
 import org.altbeacon.beacon.Beacon;
 import org.altbeacon.beacon.Identifier;
 import org.altbeacon.beacon.MonitorNotifier;
@@ -60,26 +62,35 @@ class FlutterBeaconUtils {
     return map;
   }
 
-  static Region regionFromMap(Map<String, Object> map) {
-    Identifier id1 = null, id2 = null, id3 = null;
+  static Region regionFromMap(Map map) {
+    try {
+      String identifier = "";
+      List<Identifier> identifiers = new ArrayList<>();
 
-    //noinspection ConstantConditions
-    String identifier = map.get("identifier").toString();
-    Object proximityUUID = map.get("proximityUUID");
+      Object objectIdentifier = map.get("identifier");
+      if (objectIdentifier instanceof String) {
+        identifier = objectIdentifier.toString();
+      }
 
-    if (proximityUUID instanceof String) {
-      id1 = Identifier.parse((String) proximityUUID);
+      Object proximityUUID = map.get("proximityUUID");
+
+      if (proximityUUID instanceof String) {
+        identifiers.add(Identifier.parse((String) proximityUUID));
+      }
+
+      Object major = map.get("major");
+      if (major instanceof Integer) {
+        identifiers.add(Identifier.fromInt((Integer) major));
+      }
+      Object minor = map.get("minor");
+      if (minor instanceof Integer) {
+        identifiers.add(Identifier.fromInt((Integer) minor));
+      }
+
+      return new Region(identifier, identifiers);
+    } catch (IllegalArgumentException e) {
+      Log.e("REGION", "Error : " + e);
+      return null;
     }
-
-    Object major = map.get("major");
-    if (major instanceof Integer) {
-      id2 = Identifier.fromInt((Integer) major);
-    }
-    Object minor = map.get("minor");
-    if (minor instanceof Integer) {
-      id3 = Identifier.fromInt((Integer) minor);
-    }
-
-    return new Region(identifier, id1, id2, id3);
   }
 }

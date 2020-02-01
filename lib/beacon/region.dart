@@ -1,10 +1,10 @@
-//  Copyright (c) 2018 Alann Maulana.
+//  Copyright (c) 2018 Eyro Labs.
 //  Licensed under Apache License v2.0 that can be
 //  found in the LICENSE file.
 
 part of flutter_beacon;
 
-/// Class for managing ranging region scanning.
+/// Class for managing for ranging and monitoring region scanning.
 class Region {
   /// The unique identifier of region.
   final String identifier;
@@ -27,21 +27,30 @@ class Region {
   /// Constructor for creating [Region] object.
   ///
   /// The [proximityUUID] must not be null when [Platform.isIOS]
-  Region(
-      {@required this.identifier, this.proximityUUID, this.major, this.minor}) {
+  Region({
+    @required this.identifier,
+    this.proximityUUID,
+    this.major,
+    this.minor,
+  }) {
     if (Platform.isIOS) {
-      assert(proximityUUID != null);
+      assert(
+        proximityUUID != null,
+        'Scanning beacon for iOS must provided proximityUUID',
+      );
     }
   }
 
   /// Constructor for deserialize json [Map] into [Region] object.
-  Region._fromJson(dynamic json)
-      : identifier = json['identifier'],
-        proximityUUID = json['proximityUUID'],
-        major = json['major'],
-        minor = json['minor'];
+  Region.fromJson(dynamic json)
+      : this(
+          identifier: json['identifier'],
+          proximityUUID: json['proximityUUID'],
+          major: _parseMajorMinor(json['major']),
+          minor: _parseMajorMinor(json['minor']),
+        );
 
-  /// Serialize [Region] object into json [Map].
+  /// Return the serializable of this object into [Map].
   dynamic get toJson {
     final map = <String, dynamic>{
       'identifier': identifier,
@@ -71,4 +80,25 @@ class Region {
 
   @override
   int get hashCode => identifier.hashCode;
+
+  static int _parseMajorMinor(dynamic number) {
+    if (number is int) {
+      return number;
+    }
+
+    if (number is num) {
+      return number.toInt();
+    }
+
+    if (number is String) {
+      return int.tryParse(number);
+    }
+
+    return null;
+  }
+
+  @override
+  String toString() {
+    return json.encode(toJson);
+  }
 }
